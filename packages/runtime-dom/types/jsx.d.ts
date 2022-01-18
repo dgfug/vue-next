@@ -29,7 +29,9 @@
 import { VNode } from '@vue/runtime-core'
 import * as CSS from 'csstype'
 
-export interface CSSProperties extends CSS.Properties<string | number>, CSS.PropertiesHyphen<string | number> {
+export interface CSSProperties
+  extends CSS.Properties<string | number>,
+    CSS.PropertiesHyphen<string | number> {
   /**
    * The index signature was removed to enable closed typing for style
    * using CSSType. You're able to use type assertion or module augmentation
@@ -1310,6 +1312,8 @@ type ReservedProps = {
     | string
     | RuntimeCore.Ref
     | ((ref: Element | RuntimeCore.ComponentPublicInstance | null) => void)
+  ref_for?: boolean
+  ref_key?: string
 }
 
 type ElementAttrs<T> = T & ReservedProps

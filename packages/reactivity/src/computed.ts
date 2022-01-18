@@ -4,11 +4,11 @@ import { isFunction, NOOP } from '@vue/shared'
 import { ReactiveFlags, toRaw } from './reactive'
 import { Dep } from './dep'
 
-declare const ComoutedRefSymbol: unique symbol
+declare const ComputedRefSymbol: unique symbol
 
 export interface ComputedRef<T = any> extends WritableComputedRef<T> {
   readonly value: T
-  [ComoutedRefSymbol]: true
+  [ComputedRefSymbol]: true
 }
 
 export interface WritableComputedRef<T> extends Ref<T> {
@@ -36,7 +36,8 @@ class ComputedRefImpl<T> {
   constructor(
     getter: ComputedGetter<T>,
     private readonly _setter: ComputedSetter<T>,
-    isReadonly: boolean
+    isReadonly: boolean,
+    isSSR: boolean
   ) {
     this.effect = new ReactiveEffect(getter, () => {
       if (!this._dirty) {
@@ -44,6 +45,7 @@ class ComputedRefImpl<T> {
         triggerRefValue(this)
       }
     })
+    this.effect.active = !isSSR
     this[ReactiveFlags.IS_READONLY] = isReadonly
   }
 
@@ -73,7 +75,8 @@ export function computed<T>(
 ): WritableComputedRef<T>
 export function computed<T>(
   getterOrOptions: ComputedGetter<T> | WritableComputedOptions<T>,
-  debugOptions?: DebuggerOptions
+  debugOptions?: DebuggerOptions,
+  isSSR = false
 ) {
   let getter: ComputedGetter<T>
   let setter: ComputedSetter<T>
@@ -91,9 +94,9 @@ export function computed<T>(
     setter = getterOrOptions.set
   }
 
-  const cRef = new ComputedRefImpl(getter, setter, onlyGetter || !setter)
+  const cRef = new ComputedRefImpl(getter, setter, onlyGetter || !setter, isSSR)
 
-  if (__DEV__ && debugOptions) {
+  if (__DEV__ && debugOptions && !isSSR) {
     cRef.effect.onTrack = debugOptions.onTrack
     cRef.effect.onTrigger = debugOptions.onTrigger
   }

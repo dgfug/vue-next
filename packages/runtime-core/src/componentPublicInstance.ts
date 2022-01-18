@@ -13,7 +13,8 @@ import {
   NOOP,
   extend,
   isString,
-  isFunction
+  isFunction,
+  UnionToIntersection
 } from '@vue/shared'
 import {
   toRaw,
@@ -40,7 +41,6 @@ import { Slots } from './componentSlots'
 import { markAttrsAccessed } from './componentRenderUtils'
 import { currentRenderingInstance } from './componentRenderContext'
 import { warn } from './warning'
-import { UnionToIntersection } from './helpers/typeUtils'
 import { installCompatInstanceProperties } from './compat/instance'
 
 /**
@@ -248,11 +248,11 @@ if (__COMPAT__) {
 }
 
 const enum AccessTypes {
+  OTHER,
   SETUP,
   DATA,
   PROPS,
-  CONTEXT,
-  OTHER
+  CONTEXT
 }
 
 export interface ComponentRenderContext {
@@ -437,7 +437,7 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
   ) {
     let normalizedProps
     return (
-      accessCache![key] !== undefined ||
+      !!accessCache![key] ||
       (data !== EMPTY_OBJ && hasOwn(data, key)) ||
       (setupState !== EMPTY_OBJ && hasOwn(setupState, key)) ||
       ((normalizedProps = propsOptions[0]) && hasOwn(normalizedProps, key)) ||

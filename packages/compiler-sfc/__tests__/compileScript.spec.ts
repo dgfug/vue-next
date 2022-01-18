@@ -36,7 +36,7 @@ describe('SFC compile <script setup>', () => {
     assertCode(content)
   })
 
-  test('binding analysis for destructur', () => {
+  test('binding analysis for destructure', () => {
     const { content, bindings } = compile(`
       <script setup>
       const { foo, b: bar, ['x' + 'y']: baz, x: { y, zz: { z }}} = {}
@@ -94,6 +94,18 @@ const bar = 1
     assertCode(content)
     expect(content).toMatch(`export default {
   props: propsModel,`)
+  })
+
+  // #4764
+  test('defineProps w/ leading code', () => {
+    const { content } = compile(`
+    <script setup>import { x } from './x'
+    const props = defineProps({})
+    </script>
+    `)
+    // props declaration should be inside setup, not moved along with the import
+    expect(content).not.toMatch(`const props = __props\nimport`)
+    assertCode(content)
   })
 
   test('defineEmits()', () => {
@@ -157,47 +169,12 @@ defineExpose({ foo: 123 })
   })
 
   describe('<script> and <script setup> co-usage', () => {
-    describe('spaces in ExportDefaultDeclaration node', () => {
-      // #4371
-      test('with many spaces and newline', () => {
-        // #4371
-        const { content } = compile(`
-        <script>
-        export const n = 1
-        export        default     
-        {   
-          some:'option'
-        }
-        </script>
-        <script setup>
-        import { x } from './x'
-        x()
-        </script>
-        `)
-        assertCode(content)
-      })
-
-      test('with minimal spaces', () => {
-        const { content } = compile(`
-        <script>
-        export const n = 1
-        export default{   
-          some:'option'
-        }
-        </script>
-        <script setup>
-        import { x } from './x'
-        x()
-        </script>
-        `)
-        assertCode(content)
-      })
-    })
-
     test('script first', () => {
       const { content } = compile(`
       <script>
       export const n = 1
+
+      export default {}
       </script>
       <script setup>
       import { x } from './x'
@@ -215,6 +192,22 @@ defineExpose({ foo: 123 })
       </script>
       <script>
       export const n = 1
+      export default {}
+      </script>
+      `)
+      assertCode(content)
+    })
+
+    test('script setup first, named default export', () => {
+      const { content } = compile(`
+      <script setup>
+      import { x } from './x'
+      x()
+      </script>
+      <script>
+      export const n = 1
+      const def = {}
+      export { def as default }
       </script>
       `)
       assertCode(content)
@@ -236,6 +229,43 @@ defineExpose({ foo: 123 })
       // ensure __default__ is declared before used
       expect(content).toMatch(/const __default__[\S\s]*\.\.\.__default__/m)
       assertCode(content)
+    })
+
+    describe('spaces in ExportDefaultDeclaration node', () => {
+      // #4371
+      test('with many spaces and newline', () => {
+        // #4371
+        const { content } = compile(`
+        <script>
+        export const n = 1
+        export        default
+        {
+          some:'option'
+        }
+        </script>
+        <script setup>
+        import { x } from './x'
+        x()
+        </script>
+        `)
+        assertCode(content)
+      })
+
+      test('with minimal spaces', () => {
+        const { content } = compile(`
+        <script>
+        export const n = 1
+        export default{
+          some:'option'
+        }
+        </script>
+        <script setup>
+        import { x } from './x'
+        x()
+        </script>
+        `)
+        assertCode(content)
+      })
     })
   })
 
@@ -280,7 +310,7 @@ defineExpose({ foo: 123 })
       let foo = $ref(1)
       </script>
       `,
-        { refSugar: true }
+        { reactivityTransform: true }
       )
       assertCode(content)
       expect(content).toMatch(`import { ref } from 'vue'`)
@@ -549,7 +579,7 @@ defineExpose({ foo: 123 })
           <div @click="v += 1"/>
           <div @click="v -= 1"/>
           <div @click="() => {
-              let a = '' + lett           
+              let a = '' + lett
               v = a
            }"/>
            <div @click="() => {
@@ -561,7 +591,7 @@ defineExpose({ foo: 123 })
                   let z2 = z
                 })
                 let lz = z
-              })        
+              })
               v = a
            }"/>
         </template>
@@ -1042,6 +1072,26 @@ const emit = defineEmits(['a', 'b'])
       })
     })
 
+    test('runtime Enum in normal script', () => {
+      const { content, bindings } = compile(
+        `<script lang="ts">
+          export enum D { D = "D" }
+          const enum C { C = "C" }
+          enum B { B = "B" }
+        </script>
+        <script setup lang="ts">
+        enum Foo { A = 123 }
+        </script>`
+      )
+      assertCode(content)
+      expect(bindings).toStrictEqual({
+        D: BindingTypes.SETUP_CONST,
+        C: BindingTypes.SETUP_CONST,
+        B: BindingTypes.SETUP_CONST,
+        Foo: BindingTypes.SETUP_CONST
+      })
+    })
+
     test('const Enum', () => {
       const { content, bindings } = compile(
         `<script setup lang="ts">
@@ -1058,7 +1108,7 @@ const emit = defineEmits(['a', 'b'])
   describe('async/await detection', () => {
     function assertAwaitDetection(code: string, shouldAsync = true) {
       const { content } = compile(`<script setup>${code}</script>`, {
-        refSugar: true
+        reactivityTransform: true
       })
       if (shouldAsync) {
         expect(content).toMatch(`let __temp, __restore`)
